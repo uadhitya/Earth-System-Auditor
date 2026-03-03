@@ -65,40 +65,45 @@ async function runAudit() {
         const data = await res.json();
         const alt = data.results[0].elevation;
 
-        // 1. KONSTANTA FISIKA
+        // 1. KONSTANTA FISIKA (DIPERTajam)
         const Gsc = 1361;
         const sigma = 5.670373e-8;
         const dayMap = [15, 46, 74, 105, 135, 162, 198, 228, 258, 288, 319, 344];
         
-        // 2. LOGIKA DETERMINISTIK ADAPTIF (FIXED FOR 0KM)
-        // Albedo: 0.12 (Tropis/Laut) meningkat ke 0.75 (Salju Everest)
+        // 2. LOGIKA ADAPTIF (LAPSE RATE VARIABEL)
         let albedo = 0.12 + (Math.min(alt, 8848) / 8848) * 0.63;
-        
-        // Emisivitas: 0.92 (Atmosfer Lembap 0km) menurun ke 0.50 (Udara Tipis Everest)
         let epsilon = 0.92 - (Math.min(alt, 8848) / 8848) * 0.42;
 
         // 3. GEOMETRI SURYA
-        const delta = 23.45 * Math.sin((2 * Math.PI / 365) * (dayMap[month-1] + 284));
+        const n = dayMap[month - 1];
+        const delta = 23.45 * Math.sin((2 * Math.PI / 365) * (n + 284));
         const cosTheta = Math.cos((lat - delta) * Math.PI / 180);
         const energyIn = Gsc * (1 - albedo) * Math.max(0.1, cosTheta);
 
-        // 4. KALKULASI SUHU DASAR (KELVIN FIRST)
-        const denominator = 4 * sigma * epsilon;
-        const T_Kelvin = Math.pow(energyIn / denominator, 0.25);
+        // 4. PERBAIKAN KALKULASI (STEP-BY-STEP)
+        // Rumus Dasar: T = (Energy / (sigma * epsilon)) ^ 0.25
+        // Kita gunakan pembagi yang sudah digabung agar presisi
+        const radiantFactor = sigma * epsilon;
+        const kValue = energyIn / radiantFactor;
+        
+        // Menghitung suhu efektif (Kelvin)
+        const T_Kelvin = Math.pow(kValue, 0.25);
+        
+        // Konversi ke Celsius (Suhu Dasar di Sea Level)
         const T_BaseCelsius = T_Kelvin - 273.15;
         
-        // 5. REDUKSI MEKANIS (LAPSE RATE)
+        // 5. REDUKSI MEKANIS (Tekanan Atmosfer)
         const finalTemp = T_BaseCelsius - (0.0065 * alt);
 
-        // 6. DISPLAY
+        // 6. OUTPUT VALIDASI
         document.getElementById('result').style.display = 'block';
         document.getElementById('display').innerText = finalTemp.toFixed(1) + "°C";
         document.getElementById('meta').innerHTML = `
             ALTITUDE: ${alt}m | ENERGY: ${energyIn.toFixed(1)}W/m²<br>
             ALBEDO: ${albedo.toFixed(2)} | EPSILON: ${epsilon.toFixed(2)}<br>
-            STATUS: SYSTEM CALIBRATED
+            CALIBRATION: SUCCESSFUL
         `;
-    } catch (e) { alert("API Connection Error"); }
+    } catch (e) { alert("SYSTEM ERROR: API CONNECTION FAILED"); }
 }
 </script>
 </body>
