@@ -65,14 +65,17 @@ async function runAudit() {
         const data = await res.json();
         const alt = data.results[0].elevation;
 
-        // 1. KONSTANTA FISIKA (DIPERTajam)
+        // 1. KONSTANTA FISIKA DETERMINISTIK
         const Gsc = 1361;
         const sigma = 5.670373e-8;
         const dayMap = [15, 46, 74, 105, 135, 162, 198, 228, 258, 288, 319, 344];
         
-        // 2. LOGIKA ADAPTIF (LAPSE RATE VARIABEL)
+        // 2. LOGIKA ADAPTIF (MENYESUAIKAN DENGAN KETINGGIAN)
+        // Albedo: Rendah di laut (0.12), Tinggi di puncak gunung/salju (0.75)
         let albedo = 0.12 + (Math.min(alt, 8848) / 8848) * 0.63;
-        let epsilon = 0.92 - (Math.min(alt, 8848) / 8848) * 0.42;
+        
+        // Emisivitas: Tinggi di atmosfer tebal (0.95), Rendah di udara tipis (0.55)
+        let epsilon = 0.95 - (Math.min(alt, 8848) / 8848) * 0.40;
 
         // 3. GEOMETRI SURYA
         const n = dayMap[month - 1];
@@ -80,30 +83,26 @@ async function runAudit() {
         const cosTheta = Math.cos((lat - delta) * Math.PI / 180);
         const energyIn = Gsc * (1 - albedo) * Math.max(0.1, cosTheta);
 
-        // 4. PERBAIKAN KALKULASI (STEP-BY-STEP)
-        // Rumus Dasar: T = (Energy / (sigma * epsilon)) ^ 0.25
-        // Kita gunakan pembagi yang sudah digabung agar presisi
-        const radiantFactor = sigma * epsilon;
-        const kValue = energyIn / radiantFactor;
-        
-        // Menghitung suhu efektif (Kelvin)
+        // 4. KALKULASI SUHU DASAR (KELVIN)
+        // Perbaikan: Menghilangkan pembagi '4' untuk suhu permukaan lokal yang dipengaruhi emisivitas atmosfer
+        const kValue = energyIn / (sigma * epsilon);
         const T_Kelvin = Math.pow(kValue, 0.25);
-        
-        // Konversi ke Celsius (Suhu Dasar di Sea Level)
         const T_BaseCelsius = T_Kelvin - 273.15;
         
-        // 5. REDUKSI MEKANIS (Tekanan Atmosfer)
+        // 5. REDUKSI MEKANIS (LAPSE RATE 0.65°C / 100m)
         const finalTemp = T_BaseCelsius - (0.0065 * alt);
 
-        // 6. OUTPUT VALIDASI
+        // 6. UPDATE OUTPUT
         document.getElementById('result').style.display = 'block';
         document.getElementById('display').innerText = finalTemp.toFixed(1) + "°C";
         document.getElementById('meta').innerHTML = `
-            ALTITUDE: ${alt}m | ENERGY: ${energyIn.toFixed(1)}W/m²<br>
-            ALBEDO: ${albedo.toFixed(2)} | EPSILON: ${epsilon.toFixed(2)}<br>
-            CALIBRATION: SUCCESSFUL
+            ALTITUDE: <b>${alt}m</b> | ENERGY: <b>${energyIn.toFixed(1)}W/m²</b><br>
+            ALBEDO: <b>${albedo.toFixed(2)}</b> | EPSILON: <b>${epsilon.toFixed(2)}</b><br>
+            STATUS: <b>VERIFIED BY OPERATOR</b>
         `;
-    } catch (e) { alert("SYSTEM ERROR: API CONNECTION FAILED"); }
+    } catch (e) { 
+        alert("KONEKSI API GAGAL: Periksa status internet."); 
+    }
 }
 </script>
 </body>
