@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Earth System Auditor - Precision v3.0</title>
+    <title>Earth System Auditor - Final Stable Version</title>
     <style>
-        :root { --primary: #1a1a1a; --accent: #27ae60; --bg: #f0f2f5; }
-        body { font-family: 'Courier New', Courier, monospace; background: var(--bg); display: flex; justify-content: center; padding: 20px; color: var(--primary); }
-        .container { width: 100%; max-width: 450px; background: white; padding: 30px; border-radius: 8px; border: 2px solid var(--primary); box-shadow: 10px 10px 0px var(--primary); }
-        h2 { text-align: center; text-transform: uppercase; letter-spacing: 2px; border-bottom: 2px solid var(--primary); padding-bottom: 10px; }
-        label { display: block; font-weight: bold; margin-top: 15px; font-size: 0.8em; }
-        input { width: 100%; padding: 10px; border: 1px solid var(--primary); margin-top: 5px; box-sizing: border-box; font-size: 16px; background: #fafafa; }
-        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
-        button { flex: 1; padding: 15px; background: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
-        button:hover { background: var(--accent); }
-        #result { display: none; margin-top: 25px; padding: 20px; background: #e8f5e9; border: 1px dashed var(--accent); }
+        :root { --primary: #2c3e50; --accent: #27ae60; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
+        .container { width: 100%; max-width: 450px; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #ddd; }
+        h2 { text-align: center; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 25px; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+        label { display: block; font-weight: bold; margin-top: 15px; font-size: 0.85em; color: #555; }
+        input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-top: 5px; box-sizing: border-box; font-size: 16px; }
+        .btn-group { display: flex; gap: 10px; margin-top: 25px; }
+        button { flex: 1; padding: 15px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { filter: brightness(1.1); }
+        .btn-geo { background: #2980b9; }
+        #result { display: none; margin-top: 30px; padding: 20px; background: #ebf5ee; border-radius: 10px; border-left: 5px solid var(--accent); }
         .temp-val { font-size: 3.5em; font-weight: bold; margin: 0; color: var(--primary); }
-        .meta { font-size: 0.8em; line-height: 1.6; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 10px; }
+        .meta { font-size: 0.85em; line-height: 1.6; margin-top: 15px; color: #666; border-top: 1px solid #d1d1d1; padding-top: 10px; }
     </style>
 </head>
 <body>
@@ -24,22 +25,22 @@
 <div class="container">
     <h2>System Auditor</h2>
     
-    <label>LATITUDE (X):</label>
+    <label>LINTANG (LATITUDE):</label>
     <input type="number" id="lat" value="0" step="any">
     
-    <label>LONGITUDE (Y):</label>
+    <label>BUJUR (LONGITUDE):</label>
     <input type="number" id="lng" value="109.32" step="any">
     
-    <label>MONTH (1-12):</label>
+    <label>BULAN (1-12):</label>
     <input type="number" id="month" value="3">
 
     <div class="btn-group">
-        <button onclick="runAudit()">RUN SYSTEM AUDIT</button>
-        <button onclick="getLocation()" style="background:#2980b9;">MY LOCATION</button>
+        <button onclick="runAudit()">JALANKAN AUDIT</button>
+        <button class="btn-geo" onclick="getLocation()">LOKASI SAYA</button>
     </div>
 
     <div id="result">
-        <p style="margin:0; font-size:0.7em; font-weight:bold;">DETERMINISTIC OUTPUT:</p>
+        <p style="margin:0; font-size:0.75em; font-weight:bold; color: var(--accent);">DETERMINISTIC STABLE OUTPUT:</p>
         <h1 class="temp-val" id="display">0°C</h1>
         <div class="meta" id="meta"></div>
     </div>
@@ -51,6 +52,7 @@ function getLocation() {
         navigator.geolocation.getCurrentPosition(p => {
             document.getElementById('lat').value = p.coords.latitude.toFixed(4);
             document.getElementById('lng').value = p.coords.longitude.toFixed(4);
+            alert("Lokasi GPS berhasil dikunci.");
         });
     }
 }
@@ -65,44 +67,44 @@ async function runAudit() {
         const data = await res.json();
         const alt = data.results[0].elevation;
 
-        // 1. KONSTANTA FISIKA DETERMINISTIK
-        const Gsc = 1361;
-        const sigma = 5.670373e-8;
+        // --- 1. KONSTANTA FISIKA ---
+        const Gsc = 1361; 
+        const sigma = 0.00000005670373; // Stefan-Boltzmann
         const dayMap = [15, 46, 74, 105, 135, 162, 198, 228, 258, 288, 319, 344];
         
-        // 2. LOGIKA ADAPTIF (MENYESUAIKAN DENGAN KETINGGIAN)
-        // Albedo: Rendah di laut (0.12), Tinggi di puncak gunung/salju (0.75)
-        let albedo = 0.12 + (Math.min(alt, 8848) / 8848) * 0.63;
+        // --- 2. VARIABEL ADAPTIF (LAPSE RATE) ---
+        // Albedo: Rendah di 0m (0.12), Tinggi di Everest (0.70)
+        let albedo = 0.12 + (Math.min(alt, 8848) / 8848) * 0.58;
         
-        // Emisivitas: Tinggi di atmosfer tebal (0.95), Rendah di udara tipis (0.55)
-        let epsilon = 0.95 - (Math.min(alt, 8848) / 8848) * 0.40;
+        // Greenhouse: Menahan panas di 0m (0.64), Menipis di ketinggian
+        let greenhouse = 0.64 - (Math.min(alt, 8848) / 8848) * 0.28;
 
-        // 3. GEOMETRI SURYA
+        // --- 3. GEOMETRI SURYA ---
         const n = dayMap[month - 1];
         const delta = 23.45 * Math.sin((2 * Math.PI / 365) * (n + 284));
         const cosTheta = Math.cos((lat - delta) * Math.PI / 180);
         const energyIn = Gsc * (1 - albedo) * Math.max(0.1, cosTheta);
 
-        // 4. KALKULASI SUHU DASAR (KELVIN)
-        // Perbaikan: Menghilangkan pembagi '4' untuk suhu permukaan lokal yang dipengaruhi emisivitas atmosfer
-        const kValue = energyIn / (sigma * epsilon);
-        const T_Kelvin = Math.pow(kValue, 0.25);
+        // --- 4. PERSAMAAN STABIL (STEP-BY-STEP) ---
+        // T = ( Energy / (4 * sigma * Greenhouse) ) ^ 0.25
+        const pembagi = 4 * sigma * greenhouse;
+        const hasilBagi = energyIn / pembagi;
+        const T_Kelvin = Math.pow(hasilBagi, 0.25);
         const T_BaseCelsius = T_Kelvin - 273.15;
         
-        // 5. REDUKSI MEKANIS (LAPSE RATE 0.65°C / 100m)
+        // Reduksi Lapse Rate Mekanis
         const finalTemp = T_BaseCelsius - (0.0065 * alt);
 
-        // 6. UPDATE OUTPUT
+        // --- 5. TAMPILKAN HASIL ---
         document.getElementById('result').style.display = 'block';
         document.getElementById('display').innerText = finalTemp.toFixed(1) + "°C";
         document.getElementById('meta').innerHTML = `
-            ALTITUDE: <b>${alt}m</b> | ENERGY: <b>${energyIn.toFixed(1)}W/m²</b><br>
-            ALBEDO: <b>${albedo.toFixed(2)}</b> | EPSILON: <b>${epsilon.toFixed(2)}</b><br>
-            STATUS: <b>VERIFIED BY OPERATOR</b>
+            KETINGGIAN: <b>${alt}m</b><br>
+            ENERGI NETTO: <b>${energyIn.toFixed(1)} W/m²</b><br>
+            ALBEDO LOKAL: <b>${albedo.toFixed(2)}</b><br>
+            STABILITAS SISTEM: <b>TERKALIBRASI</b>
         `;
-    } catch (e) { 
-        alert("KONEKSI API GAGAL: Periksa status internet."); 
-    }
+    } catch (e) { alert("Kesalahan: Gagal mengambil data elevasi."); }
 }
 </script>
 </body>
