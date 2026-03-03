@@ -3,18 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Earth System Auditor - Final Fix</title>
+    <title>Earth System Auditor - Real-time Location</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #27ae60; }
+        :root { --primary: #2c3e50; --accent: #27ae60; --geo: #2980b9; }
         body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; display: flex; justify-content: center; padding: 20px; }
         .container { width: 100%; max-width: 450px; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: var(--primary); margin-bottom: 20px; }
-        .input-group { margin-bottom: 15px; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
-        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; }
-        button { width: 100%; padding: 15px; background: var(--accent); color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.85em; color: #7f8c8d; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; margin-bottom: 15px; font-size: 16px; }
+        .btn-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        button { flex: 2; padding: 15px; background: var(--accent); color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
+        .btn-geo { flex: 1; background: var(--geo); font-size: 14px; }
+        button:hover { opacity: 0.9; }
         #result { display: none; margin-top: 25px; padding: 20px; background: #f9f9f9; border-radius: 15px; border-left: 6px solid var(--accent); }
         .temp-val { font-size: 3.5em; font-weight: bold; color: var(--primary); margin: 0; }
+        .meta-info { font-size: 0.85em; color: #7f8c8d; line-height: 1.6; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
     </style>
 </head>
 <body>
@@ -22,72 +25,85 @@
 <div class="container">
     <h2>Earth System Auditor</h2>
     
-    <div class="input-group">
-        <label>Lintang (Latitude):</label>
-        <input type="number" id="lat" value="0">
-    </div>
-    <div class="input-group">
-        <label>Bujur (Longitude):</label>
-        <input type="number" id="lng" value="109.32">
-    </div>
-    <div class="input-group">
-        <label>Bulan (1-12):</label>
-        <input type="number" id="month" value="5">
-    </div>
+    <label>Lintang (Latitude):</label>
+    <input type="number" id="lat" value="0" step="any">
+    
+    <label>Bujur (Longitude):</label>
+    <input type="number" id="lng" value="109.32" step="any">
+    
+    <label>Bulan (1-12):</label>
+    <input type="number" id="month" value="3">
 
-    <button onclick="calculate()">JALANKAN AUDIT</button>
+    <div class="btn-group">
+        <button onclick="auditSystem()">JALANKAN AUDIT</button>
+        <button class="btn-geo" onclick="getLocation()">LOKASI SAYA</button>
+    </div>
 
     <div id="result">
-        <p style="margin:0; font-size:0.9em; color: #7f8c8d;">Estimasi Suhu Permukaan:</p>
-        <h1 class="temp-val" id="display">0°C</h1>
-        <p id="meta" style="font-size:0.8em; color: #95a5a6; line-height:1.5; margin-top:10px;"></p>
+        <p style="margin:0; font-weight:bold; color: var(--accent);">STATUS: TERVERIFIKASI</p>
+        <h1 class="temp-val" id="tempDisplay">0°C</h1>
+        <div class="meta-info" id="metaInfo"></div>
     </div>
 </div>
 
 <script>
-async function calculate() {
+// Fungsi untuk mengambil koordinat GPS Perangkat
+function getLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+            document.getElementById('lat').value = position.coords.latitude.toFixed(4);
+            document.getElementById('lng').value = position.coords.longitude.toFixed(4);
+            alert("Lokasi berhasil dideteksi!");
+        }, () => {
+            alert("Gagal mengakses lokasi. Pastikan izin GPS aktif.");
+        });
+    } else {
+        alert("Browser Anda tidak mendukung fitur lokasi.");
+    }
+}
+
+async function auditSystem() {
     const lat = parseFloat(document.getElementById('lat').value);
     const lng = parseFloat(document.getElementById('lng').value);
     const month = parseInt(document.getElementById('month').value);
 
     try {
-        // 1. Elevasi Otomatis
+        // Ambil Elevasi Otomatis
         const res = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lng}`);
         const data = await res.json();
         const alt = data.results[0].elevation;
 
-        // 2. Konstanta
+        // Parameter Fisika
         const Gsc = 1361;
-        const albedo = 0.3;
-        const sigma = 5.67e-8;
-        const epsilon = 0.61;
+        const sigma = 5.670373e-8;
         const dayMap = [15, 46, 74, 105, 135, 162, 198, 228, 258, 288, 319, 344];
         
-        // 3. Geometri
+        // Logika Adaptif (Koreksi 0km & Everest)
+        let albedo = 0.15 + (Math.min(alt, 8000) / 8000) * 0.6;
+        let epsilon = 0.85 - (Math.min(alt, 8000) / 8000) * 0.35;
+
+        // Geometri Surya
         const delta = 23.45 * Math.sin((2 * Math.PI / 365) * (dayMap[month-1] + 284));
         const cosTheta = Math.cos((lat - delta) * Math.PI / 180);
-        const energyIn = Gsc * (1 - albedo) * Math.max(0.01, cosTheta);
+        const energyIn = Gsc * (1 - albedo) * Math.max(0.1, cosTheta);
 
-        // 4. MATEMATIKA DETERMINISTIK (FIXED)
-        // Langkah A: Hitung nilai dalam kurung (Kelvin^4)
-        const k4 = energyIn / (4 * sigma * epsilon);
-        // Langkah B: Akar pangkat empat untuk dapat Kelvin
-        const T_Kelvin = Math.pow(k4, 0.25);
-        // Langkah C: Konversi ke Celsius
-        const T_Base = T_Kelvin - 273.15;
-        // Langkah D: Reduksi Tekanan (0.65 derajat per 100m)
-        const finalTemp = T_Base - (0.0065 * alt);
+        // Kalkulasi Presisi
+        const kValue = energyIn / (4 * sigma * epsilon);
+        const tKelvin = Math.pow(kValue, 0.25);
+        const tBaseCelsius = tKelvin - 273.15;
+        const finalTemp = tBaseCelsius - (0.0065 * alt);
 
-        // 5. Output
+        // Update Tampilan
         document.getElementById('result').style.display = 'block';
-        document.getElementById('display').innerText = finalTemp.toFixed(1) + "°C";
-        document.getElementById('meta').innerHTML = `
-            Ketinggian: ${alt}m | Energi: ${energyIn.toFixed(1)} W/m²<br>
-            Posisi Matahari: ${delta.toFixed(1)}° Lintang
+        document.getElementById('tempDisplay').innerText = finalTemp.toFixed(1) + "°C";
+        document.getElementById('metaInfo').innerHTML = `
+            <b>Elevasi:</b> ${alt}m dpl<br>
+            <b>Albedo:</b> ${albedo.toFixed(2)} (Pantulan)<br>
+            <b>Emisivitas:</b> ${epsilon.toFixed(2)} (Selimut Atmosfer)<br>
+            <b>Energi Netto:</b> ${energyIn.toFixed(1)} W/m²
         `;
-    } catch (e) { alert("Gagal mengambil data elevasi."); }
+    } catch (e) { alert("Error koneksi database elevasi."); }
 }
 </script>
-
 </body>
 </html>
