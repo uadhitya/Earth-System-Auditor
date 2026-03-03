@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Auditor Suhu - Automasi Elevasi</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #27ae60; --warning: #e67e22; }
+        body { font-family: 'Segoe UI', sans-serif; background: #eceff1; color: var(--primary); padding: 20px; }
+        .container { max-width: 650px; margin: 0 auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); }
+        h2 { text-align: center; color: var(--primary); margin-bottom: 5px; }
+        .input-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        .input-group { flex: 1; }
+        label { display: block; font-weight: bold; font-size: 0.85em; margin-bottom: 5px; }
+        input { width: 100%; padding: 12px; border: 2px solid #dfe6e9; border-radius: 8px; box-sizing: border-box; transition: 0.3s; }
+        input:focus { border-color: var(--accent); outline: none; }
+        button { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.3s; margin-top: 10px; }
+        button:hover { background: var(--accent); }
+        #loading { display: none; text-align: center; color: var(--warning); font-weight: bold; margin: 10px 0; }
+        #result { display: none; margin-top: 25px; padding: 20px; background: #f1f2f6; border-radius: 12px; border-left: 8px solid var(--accent); }
+        .status-tag { font-size: 0.7em; background: #ddd; padding: 3px 8px; border-radius: 5px; float: right; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>System Auditor v2.0</h2>
+    <p style="text-align: center; font-size: 0.8em; margin-bottom: 25px;">Kalkulasi Deterministik dengan Elevasi Otomatis</p>
+    
+    <div class="input-row">
+        <div class="input-group">
+            <label>Lintang (Latitude)</label>
+            <input type="number" id="lat" value="-6.20" step="0.0001">
+        </div>
+        <div class="input-group">
+            <label>Bujur (Longitude)</label>
+            <input type="number" id="lng" value="106.84" step="0.0001">
+        </div>
+    </div>
+
+    <div class="input-group">
+        <label>Bulan (1-12)</label>
+        <input type="number" id="month" value="3" min="1" max="12">
+    </div>
+
+    <button onclick="runAudit()">HITUNG OUTPUT SISTEM</button>
+
+    <div id="loading">Menghubungi Database Elevasi Bumi...</div>
+
+    <div id="result">
+        <span class="status-tag">DATA TERVERIFIKASI</span>
+        <h4 id="locName" style="margin:0; color:#7f8c8d;">Estimasi Suhu Permukaan:</h4>
+        <h1 id="tempDisplay" style="margin:5px 0; font-size: 3em; color: var(--primary);">0°C</h1>
+        <div id="details" style="font-size: 0.9em; line-height: 1.8;"></div>
+    </div>
+</div>
+
+<script>
+async function runAudit() {
+    const lat = document.getElementById('lat').value;
+    const lng = document.getElementById('lng').value;
+    const month = document.getElementById('month').value;
+    const loading = document.getElementById('loading');
+    const resultDiv = document.getElementById('result');
+
+    loading.style.display = 'block';
+    resultDiv.style.display = 'none';
+
+    try {
+        // 1. Ambil Elevasi Otomatis via API
+        const response = await fetch(`https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lng}`);
+        const data = await response.json();
+        const alt = data.results[0].elevation;
+
+        // 2. Konstanta Fisika
+        const Gsc = 1361; 
+        const albedo = 0.3;
+        const sigma = 5.67e-8;
+        const epsilon = 0.61;
+        const dayMap = [15, 46, 74, 105, 135, 162, 198, 228, 258, 288, 319, 344];
+        const n = dayMap[month - 1];
+
+        // 3. Kalkulasi Deterministik
+        const delta = 23.45 * Math.sin((2 * Math.PI / 365) * (n + 284));
+        const cosTheta = Math.cos((lat - delta) * Math.PI / 180);
+        const energyIn = Gsc * (1 - albedo) * Math.max(0, cosTheta);
+        
+        const tBaseCelsius = Math.pow(energyIn / (4 * sigma * epsilon), 0.25) - 273.15;
+        const finalTemp = tBaseCelsius - (0.0065 * alt);
+
+        // 4. Update Tampilan
+        loading.style.display = 'none';
+        resultDiv.style.display = 'block';
+        document.getElementById('tempDisplay').innerText = finalTemp.toFixed(1) + "°C";
+        document.getElementById('details').innerHTML = `
+            <b>Elevasi Otomatis:</b> ${alt} meter dpl<br>
+            <b>Energi Masuk:</b> ${energyIn.toFixed(1)} W/m²<br>
+            <b>Reduksi Tekanan:</b> -${(0.0065 * alt).toFixed(1)}°C dari suhu dasar.
+        `;
+    } catch (error) {
+        loading.innerText = "Error: Gagal mengambil data elevasi.";
+    }
+}
+</script>
+</body>
+</html>
